@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.deepseek.chat</groupId>
+    <artifactId>deepseek-chat-parent</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+    <name>DeepSeek Chat Client - Parent</name>
+    <description>DeepSeek Chat Client 多模块项目父 POM</description>
+
+    <modules>
+        <module>chat-core</module>
+        <module>chat-api</module>
+        <module>chat-storage</module>
+        <module>chat-ui</module>
+        <module>chat-app</module>
+    </modules>
+
+    <properties>
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- 内部模块依赖 -->
+            <dependency>
+                <groupId>com.deepseek.chat</groupId>
+                <artifactId>chat-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.deepseek.chat</groupId>
+                <artifactId>chat-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.deepseek.chat</groupId>
+                <artifactId>chat-storage</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.deepseek.chat</groupId>
+                <artifactId>chat-ui</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.11.0</version>
+                    <configuration>
+                        <source>11</source>
+                        <target>11</target>
+                        <encoding>UTF-8</encoding>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>
