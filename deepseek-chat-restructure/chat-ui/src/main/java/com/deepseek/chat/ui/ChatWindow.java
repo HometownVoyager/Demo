@@ -15,7 +15,10 @@ import com.deepseek.chat.ui.dialog.WorldBookManager;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.border.MatteBorder;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.util.ArrayList;
@@ -23,15 +26,31 @@ import java.util.List;
 import java.util.Properties;
 
 /**
- * DeepSeek Chat 主窗口
- * 整合所有 UI 组件，实现聊天功能
+ * DeepSeek Chat 主窗口 - 现代化美化版本
+ * 整合所有 UI 组件，实现聊天功能，采用现代化设计风格
  */
 public class ChatWindow extends JFrame implements WorldBookManager.WorldBookCallback, CharacterManager.CharacterCallback {
     
-    private final SettingsPanel settingsPanel;
+    // 颜色方案 - 现代化渐变配色
+    private static final Color PRIMARY_COLOR = new Color(79, 70, 229);        // 靛蓝色主色调
+    private static final Color PRIMARY_DARK = new Color(67, 56, 202);         // 深靛蓝
+    private static final Color PRIMARY_LIGHT = new Color(99, 102, 241);       // 浅靛蓝
+    private static final Color ACCENT_COLOR = new Color(16, 185, 129);        // 翠绿色强调色
+    private static final Color BACKGROUND_COLOR = new Color(248, 249, 250);   // 浅灰背景
+    private static final Color CARD_BACKGROUND = new Color(255, 255, 255);    // 卡片白色背景
+    private static final Color TEXT_PRIMARY = new Color(17, 24, 39);          // 主要文字
+    private static final Color TEXT_SECONDARY = new Color(107, 114, 128);     // 次要文字
+    private static final Color BORDER_COLOR = new Color(229, 231, 235);       // 边框颜色
+    private static final Color USER_MESSAGE_BG = new Color(239, 246, 255);    // 用户消息背景
+    private static final Color AI_MESSAGE_BG = new Color(255, 255, 255);      // AI 消息背景
+    private static final Color SYSTEM_MESSAGE_COLOR = new Color(139, 92, 246);// 系统消息紫色
+    
+    private SettingsPanel settingsPanel;
     private final InputPanel inputPanel;
-    private final JTextPane chatDisplayArea;
-    private final JLabel statusLabel;
+    private JTextPane chatDisplayArea;
+    private JLabel statusLabel;
+    private JPanel characterSelectorPanel;
+    private JCheckBox summaryEnabledCheckBox;
     
     private final ConfigManager configManager;
     private final WorldBookStorage worldBookStorage;
@@ -48,7 +67,7 @@ public class ChatWindow extends JFrame implements WorldBookManager.WorldBookCall
     private int summaryThreshold = 10; // 触发总结的消息阈值
     
     public ChatWindow() {
-        super("DeepSeek Chat Client");
+        super("DeepSeek Chat - 智能多角色对话系统");
         
         configManager = new ConfigManager();
         worldBookStorage = new WorldBookStorage();
@@ -62,15 +81,7 @@ public class ChatWindow extends JFrame implements WorldBookManager.WorldBookCall
         settingsPanel = new SettingsPanel();
         inputPanel = new InputPanel();
         
-        chatDisplayArea = new JTextPane();
-        chatDisplayArea.setEditable(false);
-        chatDisplayArea.setFont(new Font("Microsoft YaHei", Font.PLAIN, 14));
-        chatDisplayArea.setBackground(new Color(255, 255, 255));
-        
-        statusLabel = new JLabel("就绪");
-        statusLabel.setBorder(new EmptyBorder(5, 10, 5, 10));
-        
-        initUI();
+        initModernUI();
         loadData();
         setupListeners();
         
@@ -84,13 +95,17 @@ public class ChatWindow extends JFrame implements WorldBookManager.WorldBookCall
         }
     }
     
-    private void initUI() {
+    /**
+     * 初始化现代化 UI 界面
+     */
+    private void initModernUI() {
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-        setSize(800, 600);
+        setSize(1200, 800); // 更大的窗口尺寸
         setLocationRelativeTo(null);
-        setLayout(new BorderLayout(10, 10));
-        getContentPane().setBackground(new Color(245, 245, 245));
+        setLayout(new BorderLayout(0, 0));
+        getContentPane().setBackground(BACKGROUND_COLOR);
         
+        // 窗口关闭监听
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
@@ -99,20 +114,221 @@ public class ChatWindow extends JFrame implements WorldBookManager.WorldBookCall
             }
         });
         
+        // 顶部标题栏 - 渐变背景
+        JPanel headerPanel = createHeaderPanel();
+        
+        // 聊天显示区域 - 现代化样式
+        chatDisplayArea = new JTextPane();
+        chatDisplayArea.setEditable(false);
+        chatDisplayArea.setFont(new Font("Microsoft YaHei UI", Font.PLAIN, 15));
+        chatDisplayArea.setBackground(CARD_BACKGROUND);
+        chatDisplayArea.setCaretColor(TEXT_PRIMARY);
+        
         JScrollPane chatScrollPane = new JScrollPane(chatDisplayArea);
-        chatScrollPane.setBorder(BorderFactory.createTitledBorder("对话记录"));
+        chatScrollPane.setBorder(null);
+        chatScrollPane.setBackground(CARD_BACKGROUND);
+        chatScrollPane.getViewport().setBackground(CARD_BACKGROUND);
         
-        add(statusLabel, BorderLayout.NORTH);
-        add(settingsPanel, BorderLayout.CENTER);
-        add(chatScrollPane, BorderLayout.CENTER);
-        add(inputPanel, BorderLayout.SOUTH);
+        // 左侧边栏 - 角色选择和设置
+        JPanel sidebarPanel = createSidebarPanel();
         
-        // 重新调整布局
-        remove(settingsPanel);
-        JPanel centerPanel = new JPanel(new BorderLayout());
-        centerPanel.add(settingsPanel, BorderLayout.NORTH);
-        centerPanel.add(chatScrollPane, BorderLayout.CENTER);
-        add(centerPanel, BorderLayout.CENTER);
+        // 底部输入面板
+        JPanel bottomPanel = createBottomPanel();
+        
+        // 主内容区域
+        JPanel mainContentPanel = new JPanel(new BorderLayout());
+        mainContentPanel.setBackground(CARD_BACKGROUND);
+        mainContentPanel.add(chatScrollPane, BorderLayout.CENTER);
+        mainContentPanel.add(bottomPanel, BorderLayout.SOUTH);
+        
+        // 添加组件到主窗口
+        add(headerPanel, BorderLayout.NORTH);
+        add(sidebarPanel, BorderLayout.WEST);
+        add(mainContentPanel, BorderLayout.CENTER);
+    }
+    
+    /**
+     * 创建顶部标题栏
+     */
+    private JPanel createHeaderPanel() {
+        JPanel headerPanel = new JPanel(new BorderLayout(15, 0));
+        headerPanel.setBackground(PRIMARY_COLOR);
+        headerPanel.setBorder(new EmptyBorder(15, 25, 15, 25));
+        
+        // 标题和图标
+        JLabel titleLabel = new JLabel("🤖 DeepSeek Chat");
+        titleLabel.setFont(new Font("Microsoft YaHei UI", Font.BOLD, 22));
+        titleLabel.setForeground(Color.WHITE);
+        
+        JLabel subtitleLabel = new JLabel("智能多角色对话系统");
+        subtitleLabel.setFont(new Font("Microsoft YaHei UI", Font.PLAIN, 13));
+        subtitleLabel.setForeground(new Color(200, 200, 255));
+        
+        JPanel titlePanel = new JPanel(new GridLayout(2, 1, 0, 3));
+        titlePanel.setBackground(PRIMARY_COLOR);
+        titlePanel.setOpaque(false);
+        titlePanel.add(titleLabel);
+        titlePanel.add(subtitleLabel);
+        
+        // 状态标签
+        statusLabel = new JLabel("● 就绪");
+        statusLabel.setFont(new Font("Microsoft YaHei UI", Font.PLAIN, 13));
+        statusLabel.setForeground(new Color(200, 255, 200));
+        statusLabel.setBorder(new EmptyBorder(0, 10, 0, 10));
+        
+        headerPanel.add(titlePanel, BorderLayout.WEST);
+        headerPanel.add(statusLabel, BorderLayout.EAST);
+        
+        return headerPanel;
+    }
+    
+    /**
+     * 创建左侧边栏（角色选择和设置）
+     */
+    private JPanel createSidebarPanel() {
+        JPanel sidebarPanel = new JPanel(new BorderLayout());
+        sidebarPanel.setBackground(CARD_BACKGROUND);
+        sidebarPanel.setPreferredSize(new Dimension(320, 0));
+        sidebarPanel.setBorder(new MatteBorder(0, 0, 0, 1, BORDER_COLOR));
+        
+        // 滚动面板
+        JScrollPane scrollPane = new JScrollPane();
+        scrollPane.setBorder(null);
+        scrollPane.setBackground(CARD_BACKGROUND);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+        contentPanel.setBackground(CARD_BACKGROUND);
+        contentPanel.setBorder(new EmptyBorder(20, 20, 20, 20));
+        
+        // 角色选择区域
+        JPanel characterSelectPanel = new JPanel(new BorderLayout());
+        characterSelectPanel.setBackground(new Color(249, 250, 251));
+        characterSelectPanel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(BORDER_COLOR),
+            new EmptyBorder(15, 15, 15, 15)
+        ));
+        
+        JLabel charTitleLabel = new JLabel("🎭 角色选择");
+        charTitleLabel.setFont(new Font("Microsoft YaHei UI", Font.BOLD, 15));
+        charTitleLabel.setForeground(TEXT_PRIMARY);
+        
+        characterSelectorPanel = new JPanel();
+        characterSelectorPanel.setLayout(new BoxLayout(characterSelectorPanel, BoxLayout.Y_AXIS));
+        characterSelectorPanel.setBackground(new Color(249, 250, 251));
+        
+        characterSelectPanel.add(charTitleLabel, BorderLayout.NORTH);
+        characterSelectPanel.add(new JScrollPane(characterSelectorPanel), BorderLayout.CENTER);
+        
+        // 上下文总结开关
+        summaryEnabledCheckBox = new JCheckBox("📝 启用上下文总结");
+        summaryEnabledCheckBox.setFont(new Font("Microsoft YaHei UI", Font.PLAIN, 13));
+        summaryEnabledCheckBox.setForeground(TEXT_SECONDARY);
+        summaryEnabledCheckBox.setBackground(CARD_BACKGROUND);
+        summaryEnabledCheckBox.setSelected(true);
+        summaryEnabledCheckBox.setBorder(new EmptyBorder(10, 0, 10, 0));
+        
+        // 快捷操作按钮
+        JPanel actionButtonPanel = new JPanel(new GridLayout(2, 2, 10, 10));
+        actionButtonPanel.setBackground(CARD_BACKGROUND);
+        actionButtonPanel.setBorder(new EmptyBorder(15, 0, 15, 0));
+        
+        JButton worldBookBtn = createStyledButton("📚 世界书", ACCENT_COLOR);
+        JButton characterBtn = createStyledButton("🎴 角色卡", PRIMARY_LIGHT);
+        JButton clearBtn = createStyledButton("🗑️ 清空", new Color(239, 68, 68));
+        JButton settingsBtn = createStyledButton("⚙️ 设置", TEXT_SECONDARY);
+        
+        actionButtonPanel.add(worldBookBtn);
+        actionButtonPanel.add(characterBtn);
+        actionButtonPanel.add(clearBtn);
+        actionButtonPanel.add(settingsBtn);
+        
+        // 添加到内容面板
+        contentPanel.add(characterSelectPanel);
+        contentPanel.add(summaryEnabledCheckBox);
+        contentPanel.add(actionButtonPanel);
+        
+        // 存储按钮引用以便设置监听器
+        settingsPanel = new SettingsPanelWrapper(worldBookBtn, characterBtn, clearBtn, settingsBtn);
+        
+        scrollPane.setViewportView(contentPanel);
+        sidebarPanel.add(scrollPane, BorderLayout.CENTER);
+        
+        return sidebarPanel;
+    }
+    
+    /**
+     * 创建底部输入面板
+     */
+    private JPanel createBottomPanel() {
+        JPanel bottomPanel = new JPanel(new BorderLayout());
+        bottomPanel.setBackground(CARD_BACKGROUND);
+        bottomPanel.setBorder(new MatteBorder(1, 0, 0, 0, BORDER_COLOR));
+        bottomPanel.setPreferredSize(new Dimension(0, 100));
+        
+        // 输入区域
+        inputPanel = new InputPanel();
+        inputPanel.setBackground(CARD_BACKGROUND);
+        inputPanel.setBorder(new EmptyBorder(15, 25, 15, 25));
+        
+        bottomPanel.add(inputPanel, BorderLayout.CENTER);
+        
+        return bottomPanel;
+    }
+    
+    /**
+     * 创建样式化按钮
+     */
+    private JButton createStyledButton(String text, Color bgColor) {
+        JButton button = new JButton(text);
+        button.setFont(new Font("Microsoft YaHei UI", Font.PLAIN, 12));
+        button.setBackground(bgColor);
+        button.setForeground(Color.WHITE);
+        button.setFocusPainted(false);
+        button.setBorderPainted(false);
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        button.setPreferredSize(new Dimension(120, 35));
+        button.setMaximumSize(new Dimension(120, 35));
+        
+        // 鼠标悬停效果
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.MouseEvent evt) {
+                button.setBackground(bgColor.darker());
+            }
+            public void mouseExited(java.awt.MouseEvent evt) {
+                button.setBackground(bgColor);
+            }
+        });
+        
+        return button;
+    }
+    
+    /**
+     * 设置面板包装类（用于兼容现有代码）
+     */
+    private class SettingsPanelWrapper {
+        private final JButton worldBookBtn;
+        private final JButton characterBtn;
+        private final JButton clearBtn;
+        private final JButton settingsBtn;
+        
+        public SettingsPanelWrapper(JButton wb, JButton cb, JButton cl, JButton st) {
+            this.worldBookBtn = wb;
+            this.characterBtn = cb;
+            this.clearBtn = cl;
+            this.settingsBtn = st;
+        }
+        
+        public JButton getWorldBookButton() { return worldBookBtn; }
+        public JButton getCharacterButton() { return characterBtn; }
+        public JButton getClearButton() { return clearBtn; }
+        public JButton getSaveSettingsButton() { return settingsBtn; }
+    }
+    
+    @Deprecated
+    private void initUI() {
+        // 旧版初始化方法，已废弃
     }
     
     private void loadData() {
@@ -180,6 +396,20 @@ public class ChatWindow extends JFrame implements WorldBookManager.WorldBookCall
     }
     
     /**
+     * 获取选中的普通角色卡列表
+     */
+    private List<CharacterCard> getSelectedNormalCharacters() {
+        List<String> selectedNames = getSelectedCharactersFromPanel();
+        List<CharacterCard> result = new ArrayList<>();
+        for (CharacterCard cc : characters) {
+            if (!cc.isBackground() && selectedNames.contains(cc.getName())) {
+                result.add(cc);
+            }
+        }
+        return result;
+    }
+    
+    /**
      * 获取背景角色卡（如果有）
      */
     private CharacterCard getBackgroundCharacter() {
@@ -189,20 +419,6 @@ public class ChatWindow extends JFrame implements WorldBookManager.WorldBookCall
             }
         }
         return null;
-    }
-    
-    /**
-     * 获取选中的普通角色卡列表
-     */
-    private List<CharacterCard> getSelectedNormalCharacters() {
-        List<String> selectedNames = settingsPanel.getSelectedCharacters();
-        List<CharacterCard> result = new ArrayList<>();
-        for (CharacterCard cc : characters) {
-            if (!cc.isBackground() && selectedNames.contains(cc.getName())) {
-                result.add(cc);
-            }
-        }
-        return result;
     }
     
     private void sendMessage() {
@@ -572,13 +788,44 @@ public class ChatWindow extends JFrame implements WorldBookManager.WorldBookCall
         for (WorldBook wb : worldBooks) {
             worldBookNames.add(wb.getName());
         }
-        settingsPanel.setWorldBookItems(worldBookNames.toArray(new String[0]));
+        // settingsPanel.setWorldBookItems(worldBookNames.toArray(new String[0]));
         
-        List<String> characterNames = new ArrayList<>();
+        // 更新角色选择面板
+        characterSelectorPanel.removeAll();
         for (CharacterCard cc : characters) {
-            characterNames.add(cc.getName());
+            JCheckBox checkBox = new JCheckBox(cc.getName());
+            checkBox.setFont(new Font("Microsoft YaHei UI", Font.PLAIN, 13));
+            checkBox.setBackground(new Color(249, 250, 251));
+            checkBox.setForeground(TEXT_PRIMARY);
+            checkBox.setBorder(new EmptyBorder(8, 5, 8, 5));
+            
+            // 如果是背景角色，添加特殊标记
+            if (cc.isBackground()) {
+                checkBox.setText(cc.getName() + " 📜 (背景)");
+            }
+            
+            characterSelectorPanel.add(checkBox);
         }
-        settingsPanel.setCharacterItems(characterNames.toArray(new String[0]));
+        characterSelectorPanel.revalidate();
+        characterSelectorPanel.repaint();
+    }
+    
+    /**
+     * 获取选中的角色卡名称列表（从新的复选框面板）
+     */
+    public List<String> getSelectedCharactersFromPanel() {
+        List<String> selected = new ArrayList<>();
+        for (Component comp : characterSelectorPanel.getComponents()) {
+            if (comp instanceof JCheckBox) {
+                JCheckBox cb = (JCheckBox) comp;
+                if (cb.isSelected()) {
+                    // 移除背景标记文本
+                    String name = cb.getText().replace(" 📜 (背景)", "");
+                    selected.add(name);
+                }
+            }
+        }
+        return selected;
     }
     
     private void showApiKeyDialog() {

@@ -16,7 +16,6 @@
         <module>chat-api</module>
         <module>chat-storage</module>
         <module>chat-ui</module>
-        <module>chat-app</module>
     </modules>
 
     <properties>
