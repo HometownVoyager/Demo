@@ -32,6 +32,9 @@ public class DeepSeekChatClient extends JFrame {
     private JTextPane chatDisplayArea;
     private JTextField messageInputField;
     private JButton sendButton;
+    private JButton retryButton;
+    private JButton editLastUserButton;
+    private JButton editLastAiButton;
     private JButton clearButton;
     private JButton saveSettingsButton;
     private JButton worldBookButton;
@@ -47,6 +50,7 @@ public class DeepSeekChatClient extends JFrame {
     private List<WorldBook> worldBooks;
     private List<CharacterCard> characters;
     private boolean isLoading = false;
+    private String lastUserMessage = null; // 用于 Retry 功能
     
     // DeepSeek API 地址
     private static final String API_URL = "https://api.deepseek.com/v1/chat/completions";
@@ -59,6 +63,10 @@ public class DeepSeekChatClient extends JFrame {
         characters = new ArrayList<>();
         initUI();
         loadConfig();
+        // 检查是否需要强制输入 API Key
+        if (apiKey == null || apiKey.isEmpty() || systemPrompt == null || systemPrompt.isEmpty()) {
+            showApiKeyDialog();
+        }
         loadHistory();
         loadWorldBooks();
         loadCharacters();
@@ -196,6 +204,30 @@ public class DeepSeekChatClient extends JFrame {
         panel.setBorder(new EmptyBorder(10, 10, 10, 10));
         panel.setBackground(new Color(230, 230, 230));
         
+        // 底部按钮面板（Retry、编辑等）
+        JPanel bottomButtonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
+        
+        retryButton = new JButton("🔄 Retry");
+        retryButton.setToolTipText("重新生成最后一条 AI 回复");
+        retryButton.addActionListener(e -> retryLastMessage());
+        retryButton.setEnabled(false);
+        
+        editLastUserButton = new JButton("✏️ 编辑最后输入");
+        editLastUserButton.setToolTipText("编辑最后一条用户消息并重新发送");
+        editLastUserButton.addActionListener(e -> editLastUserMessage());
+        editLastUserButton.setEnabled(false);
+        
+        editLastAiButton = new JButton("✏️ 编辑最后回复");
+        editLastAiButton.setToolTipText("编辑最后一条 AI 回复");
+        editLastAiButton.addActionListener(e -> editLastAiMessage());
+        editLastAiButton.setEnabled(false);
+        
+        bottomButtonPanel.add(retryButton);
+        bottomButtonPanel.add(editLastUserButton);
+        bottomButtonPanel.add(editLastAiButton);
+        
+        // 输入面板
+        JPanel inputSubPanel = new JPanel(new BorderLayout(10, 0));
         messageInputField = new JTextField();
         messageInputField.setFont(new Font("Microsoft YaHei", Font.PLAIN, 14));
         messageInputField.addActionListener(e -> sendMessage());
@@ -204,8 +236,11 @@ public class DeepSeekChatClient extends JFrame {
         sendButton.setFont(new Font("Microsoft YaHei", Font.BOLD, 14));
         sendButton.addActionListener(e -> sendMessage());
         
-        panel.add(messageInputField, BorderLayout.CENTER);
-        panel.add(sendButton, BorderLayout.EAST);
+        inputSubPanel.add(messageInputField, BorderLayout.CENTER);
+        inputSubPanel.add(sendButton, BorderLayout.EAST);
+        
+        panel.add(bottomButtonPanel, BorderLayout.NORTH);
+        panel.add(inputSubPanel, BorderLayout.CENTER);
         
         return panel;
     }
@@ -255,6 +290,93 @@ public class DeepSeekChatClient extends JFrame {
         } catch (Exception ex) {
             appendToChat("[系统] 保存设置失败：" + ex.getMessage());
             JOptionPane.showMessageDialog(this, "保存设置失败：" + ex.getMessage(), "错误", JOptionPane.ERROR_MESSAGE);
+        }
+        
+        // 保存后更新按钮状态
+        updateEditButtons();
+    }
+    
+    // 显示 API Key 输入对话框（强制）
+    private void showApiKeyDialog() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBorder(new EmptyBorder(20, 20, 20, 20));
+        
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        JLabel titleLabel = new JLabel("欢迎使用 DeepSeek Chat Client");
+        titleLabel.setFont(new Font("Microsoft YaHei", Font.BOLD, 16));
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.gridwidth = 2;
+        panel.add(titleLabel, gbc);
+        
+        JLabel descLabel = new JLabel("<html>首次使用，请先设置 API Key 和 System Prompt<br/>这些设置可以随时在设置面板中修改</html>");
+        gbc.gridy = 1;
+        panel.add(descLabel, gbc);
+        
+        gbc.gridy = 2;
+        gbc.gridwidth = 1;
+        gbc.weightx = 0;
+        panel.add(new JLabel("API Key:"), gbc);
+        
+        gbc.gridx = 1;
+        gbc.weightx = 1;
+        JPasswordField apiKeyInput = new JPasswordField(30);
+        panel.add(apiKeyInput, gbc);
+        
+        gbc.gridx = 0;
+        gbc.gridy = 3;
+        gbc.weightx = 0;
+        panel.add(new JLabel("System Prompt:"), gbc);
+        
+        gbc.gridx = 1;
+        gbc.weightx = 1;
+        JTextArea systemPromptInput = new JTextArea(3, 30);
+        systemPromptInput.setLineWrap(true);
+        systemPromptInput.setWrapStyleWord(true);
+        systemPromptInput.setText("你是一个有帮助的 AI 助手。请用中文回答用户的问题。");
+        JScrollPane sp = new JScrollPane(systemPromptInput);
+        panel.add(sp, gbc);
+        
+        int result = JOptionPane.showConfirmDialog(this, panel, 
+            "初始设置", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        
+        if (result == JOptionPane.OK_OPTION) {
+            String inputApiKey = apiKeyInput.getText().trim();
+            String inputSystemPrompt = systemPromptInput.getText().trim();
+            
+            if (inputApiKey.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "API Key 不能为空", "错误", JOptionPane.ERROR_MESSAGE);
+                showApiKeyDialog(); // 重新显示
+                return;
+            }
+            
+            // 保存到配置文件
+            try {
+                Properties props = new Properties();
+                props.setProperty("api.key", inputApiKey);
+                props.setProperty("system.prompt", inputSystemPrompt);
+                
+                try (FileOutputStream fos = new FileOutputStream(CONFIG_FILE)) {
+                    props.store(fos, "DeepSeek Chat Config");
+                }
+                
+                // 更新界面
+                apiKeyField.setText(inputApiKey);
+                systemPromptArea.setText(inputSystemPrompt);
+                apiKey = inputApiKey;
+                systemPrompt = inputSystemPrompt;
+                
+                appendToChat("[系统] 初始设置已保存");
+            } catch (Exception e) {
+                appendToChat("[系统] 保存设置失败：" + e.getMessage());
+                JOptionPane.showMessageDialog(this, "保存设置失败：" + e.getMessage(), "错误", JOptionPane.ERROR_MESSAGE);
+            }
+        } else {
+            // 用户取消，仍然允许使用，但提示
+            appendToChat("[系统] 请手动在设置面板中输入 API Key");
         }
     }
     
@@ -333,11 +455,15 @@ public class DeepSeekChatClient extends JFrame {
         // 添加用户消息到历史和显示
         chatHistory.add(new ChatMessage("user", userMessage));
         displayMessage("user", userMessage);
+        lastUserMessage = userMessage; // 保存最后一条用户消息用于 Retry
         messageInputField.setText("");
+        
+        updateEditButtons(); // 更新编辑按钮状态
         
         // 发送请求到 API
         isLoading = true;
         sendButton.setEnabled(false);
+        retryButton.setEnabled(false);
         statusLabel.setText("正在发送请求...");
         
         new Thread(() -> {
@@ -350,6 +476,8 @@ public class DeepSeekChatClient extends JFrame {
                     saveHistory();
                     isLoading = false;
                     sendButton.setEnabled(true);
+                    retryButton.setEnabled(true); // 启用 Retry 按钮
+                    updateEditButtons();
                     statusLabel.setText("就绪");
                 });
             } catch (Exception ex) {
@@ -357,6 +485,8 @@ public class DeepSeekChatClient extends JFrame {
                     appendToChat("[错误] " + ex.getMessage());
                     isLoading = false;
                     sendButton.setEnabled(true);
+                    retryButton.setEnabled(true); // 即使失败也允许重试
+                    updateEditButtons();
                     statusLabel.setText("请求失败");
                 });
             }
@@ -546,10 +676,144 @@ public class DeepSeekChatClient extends JFrame {
         
         if (result == JOptionPane.YES_OPTION) {
             chatHistory.clear();
+            lastUserMessage = null;
             chatDisplayArea.setText("");
             appendToChat("[系统] 对话记录已清空");
             saveHistory();
+            updateEditButtons();
         }
+    }
+    
+    // 更新编辑按钮状态
+    private void updateEditButtons() {
+        boolean hasMessages = !chatHistory.isEmpty();
+        editLastUserButton.setEnabled(hasMessages && lastUserMessage != null);
+        editLastAiButton.setEnabled(hasMessages && chatHistory.size() > 0 && 
+            "assistant".equals(chatHistory.get(chatHistory.size() - 1).getRole()));
+        retryButton.setEnabled(hasMessages && lastUserMessage != null && !isLoading);
+    }
+    
+    // Retry 功能：重新生成最后一条 AI 回复
+    private void retryLastMessage() {
+        if (lastUserMessage == null || isLoading) {
+            return;
+        }
+        
+        // 移除最后一条 AI 回复
+        if (!chatHistory.isEmpty() && "assistant".equals(chatHistory.get(chatHistory.size() - 1).getRole())) {
+            chatHistory.remove(chatHistory.size() - 1);
+            // 重新显示聊天记录（移除最后一条）
+            refreshChatDisplay();
+        }
+        
+        // 重新发送最后一条用户消息
+        sendMessageWithText(lastUserMessage);
+    }
+    
+    // 编辑最后一条用户消息
+    private void editLastUserMessage() {
+        if (lastUserMessage == null) {
+            return;
+        }
+        
+        String editedMessage = JOptionPane.showInputDialog(this, 
+            "编辑最后一条用户消息：", lastUserMessage);
+        
+        if (editedMessage != null && !editedMessage.trim().isEmpty()) {
+            lastUserMessage = editedMessage.trim();
+            // 移除最后两条消息（用户消息和 AI 回复）
+            while (!chatHistory.isEmpty()) {
+                ChatMessage last = chatHistory.get(chatHistory.size() - 1);
+                if ("assistant".equals(last.getRole()) || "user".equals(last.getRole())) {
+                    chatHistory.remove(chatHistory.size() - 1);
+                } else {
+                    break;
+                }
+            }
+            // 重新显示聊天记录
+            refreshChatDisplay();
+            // 重新发送
+            sendMessageWithText(lastUserMessage);
+        }
+    }
+    
+    // 编辑最后一条 AI 回复
+    private void editLastAiMessage() {
+        if (chatHistory.isEmpty()) {
+            return;
+        }
+        
+        int lastIndex = chatHistory.size() - 1;
+        ChatMessage lastMsg = chatHistory.get(lastIndex);
+        
+        if (!"assistant".equals(lastMsg.getRole())) {
+            JOptionPane.showMessageDialog(this, "最后一条消息不是 AI 回复", "提示", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        
+        String editedContent = JOptionPane.showInputDialog(this, 
+            "编辑 AI 回复：", lastMsg.getContent());
+        
+        if (editedContent != null) {
+            chatHistory.set(lastIndex, new ChatMessage("assistant", editedContent));
+            refreshChatDisplay();
+            saveHistory();
+            appendToChat("[系统] AI 回复已编辑并保存");
+        }
+    }
+    
+    // 刷新聊天显示区域
+    private void refreshChatDisplay() {
+        chatDisplayArea.setText("");
+        for (ChatMessage msg : chatHistory) {
+            displayMessage(msg.getRole(), msg.getContent());
+        }
+    }
+    
+    // 使用指定文本发送消息（用于 Retry 和编辑功能）
+    private void sendMessageWithText(String text) {
+        if (text == null || text.isEmpty() || apiKey == null || apiKey.isEmpty() || isLoading) {
+            return;
+        }
+        
+        // 添加用户消息到历史和显示
+        chatHistory.add(new ChatMessage("user", text));
+        displayMessage("user", text);
+        messageInputField.setText("");
+        
+        updateEditButtons();
+        
+        // 发送请求到 API
+        isLoading = true;
+        sendButton.setEnabled(false);
+        retryButton.setEnabled(false);
+        statusLabel.setText("正在发送请求...");
+        
+        new Thread(() -> {
+            try {
+                String response = callDeepSeekAPI(text);
+                
+                SwingUtilities.invokeLater(() -> {
+                    chatHistory.add(new ChatMessage("assistant", response));
+                    displayMessage("assistant", response);
+                    saveHistory();
+                    isLoading = false;
+                    sendButton.setEnabled(true);
+                    retryButton.setEnabled(true);
+                    updateEditButtons();
+                    statusLabel.setText("就绪");
+                });
+            } catch (Exception ex) {
+                SwingUtilities.invokeLater(() -> {
+                    appendToChat("[错误] " + ex.getMessage());
+                    isLoading = false;
+                    sendButton.setEnabled(true);
+                    retryButton.setEnabled(true);
+                    updateEditButtons();
+                    statusLabel.setText("请求失败");
+                });
+            }
+        }).start();
     }
     
     // 打开世界书管理器
