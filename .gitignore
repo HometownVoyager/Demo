@@ -1,60 +1,47 @@
 ```
-# Compiled Java classes
+# Compiled and binary files
 *.class
-
-# Build output directory
-out/
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.a
+*.out
 
 # Dependencies
 node_modules/
 venv/
 .venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
 target/
 .gradle/
 
-# IDE files
+# Editors/IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# Logs and temp files
-*.log
 *.tmp
 
-# Environment files
+# System/Environment
+.DS_Store
+Thumbs.db
 .env
 .env.local
 *.env.*
 
-# OS files
-.DS_Store
-Thumbs.db
-
-# Coverage reports
+# Logs and coverage
+*.log
 coverage/
 htmlcov/
-*.coverage
+.coverage
 
-# Python cache
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# Python virtual environments
-.venv/
-venv/
-env/
-
-# Node.js
-node_modules/
-
-# MyPy
-.mypy_cache/
-
-# Pytest
-.pytest_cache/
+# Build artifacts
+dist/
+build/
 
 # Compressed files
 *.zip
