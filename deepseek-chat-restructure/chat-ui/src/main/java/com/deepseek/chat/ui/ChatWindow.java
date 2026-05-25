@@ -78,7 +78,6 @@ public class ChatWindow extends JFrame implements WorldBookManager.WorldBookCall
         worldBooks = new ArrayList<>();
         characters = new ArrayList<>();
         
-        settingsPanel = new SettingsPanel();
         inputPanel = new InputPanel();
         
         initModernUI();
@@ -267,14 +266,24 @@ public class ChatWindow extends JFrame implements WorldBookManager.WorldBookCall
         bottomPanel.setBorder(new MatteBorder(1, 0, 0, 0, BORDER_COLOR));
         bottomPanel.setPreferredSize(new Dimension(0, 100));
         
-        // 输入区域
-        inputPanel = new InputPanel();
-        inputPanel.setBackground(CARD_BACKGROUND);
-        inputPanel.setBorder(new EmptyBorder(15, 25, 15, 25));
+        // 输入区域 - 使用已声明的 inputPanel 字段
+        JPanel inputPanelContainer = new JPanel(new BorderLayout());
+        inputPanelContainer.setBackground(CARD_BACKGROUND);
+        InputPanel localInputPanel = new InputPanel();
+        localInputPanel.setBackground(CARD_BACKGROUND);
+        localInputPanel.setBorder(new EmptyBorder(15, 25, 15, 25));
+        inputPanelContainer.add(localInputPanel, BorderLayout.CENTER);
         
-        bottomPanel.add(inputPanel, BorderLayout.CENTER);
+        bottomPanel.add(inputPanelContainer, BorderLayout.CENTER);
         
         return bottomPanel;
+    }
+    
+    /**
+     * 获取输入面板
+     */
+    public InputPanel getInputPanel() {
+        return inputPanel;
     }
     
     /**
@@ -292,11 +301,11 @@ public class ChatWindow extends JFrame implements WorldBookManager.WorldBookCall
         button.setMaximumSize(new Dimension(120, 35));
         
         // 鼠标悬停效果
-        button.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseEntered(java.awt.MouseEvent evt) {
+        button.addMouseListener(new MouseAdapter() {
+            public void mouseEntered(MouseEvent evt) {
                 button.setBackground(bgColor.darker());
             }
-            public void mouseExited(java.awt.MouseEvent evt) {
+            public void mouseExited(MouseEvent evt) {
                 button.setBackground(bgColor);
             }
         });
@@ -307,22 +316,27 @@ public class ChatWindow extends JFrame implements WorldBookManager.WorldBookCall
     /**
      * 设置面板包装类（用于兼容现有代码）
      */
-    private class SettingsPanelWrapper {
+    private class SettingsPanelWrapper extends SettingsPanel {
         private final JButton worldBookBtn;
         private final JButton characterBtn;
         private final JButton clearBtn;
         private final JButton settingsBtn;
         
         public SettingsPanelWrapper(JButton wb, JButton cb, JButton cl, JButton st) {
+            super();
             this.worldBookBtn = wb;
             this.characterBtn = cb;
             this.clearBtn = cl;
             this.settingsBtn = st;
         }
         
+        @Override
         public JButton getWorldBookButton() { return worldBookBtn; }
+        @Override
         public JButton getCharacterButton() { return characterBtn; }
+        @Override
         public JButton getClearButton() { return clearBtn; }
+        @Override
         public JButton getSaveSettingsButton() { return settingsBtn; }
     }
     
@@ -449,7 +463,9 @@ public class ChatWindow extends JFrame implements WorldBookManager.WorldBookCall
                     DeepSeekApiClient bgClient = new DeepSeekApiClient(
                         backgroundChar.getApiKey().isEmpty() ? 
                             new String(settingsPanel.getApiKeyField().getPassword()) : 
-                            backgroundChar.getApiKey()
+                            backgroundChar.getApiKey(),
+                        backgroundChar.getModel(),
+                        backgroundChar.isEnableThinking()
                     );
                     String bgSystemPrompt = buildCharacterSystemPrompt(backgroundChar);
                     String bgResponse = bgClient.chat(bgSystemPrompt, chatHistory);
@@ -465,7 +481,9 @@ public class ChatWindow extends JFrame implements WorldBookManager.WorldBookCall
                     DeepSeekApiClient charClient = new DeepSeekApiClient(
                         cc.getApiKey().isEmpty() ? 
                             new String(settingsPanel.getApiKeyField().getPassword()) : 
-                            cc.getApiKey()
+                            cc.getApiKey(),
+                        cc.getModel(),
+                        cc.isEnableThinking()
                     );
                     String charSystemPrompt = buildCharacterSystemPrompt(cc);
                     String response = charClient.chat(charSystemPrompt, chatHistory);

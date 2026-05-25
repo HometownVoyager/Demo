@@ -2,7 +2,7 @@ package com.deepseek.chat.core.model;
 
 /**
  * 角色卡模型
- * 存储角色的名称、描述、性格、问候语和 API Key
+ * 存储角色的名称、描述、性格、问候语、API Key、模型选择和思考开关
  */
 public class CharacterCard {
     private String name;
@@ -10,6 +10,8 @@ public class CharacterCard {
     private String personality;
     private String greeting;
     private String apiKey;
+    private String model; // 模型选择：deepseek-v4-flash, deepseek-v4-pro, deepseek-chat, deepseek-reasoner
+    private boolean enableThinking; // 是否开启思考模式
     private boolean isBackground; // 是否为背景角色（旁白/宏观调控者）
 
     public CharacterCard(String name, String description, String personality, String greeting) {
@@ -18,6 +20,8 @@ public class CharacterCard {
         this.personality = personality;
         this.greeting = greeting;
         this.apiKey = "";
+        this.model = "deepseek-chat"; // 默认模型
+        this.enableThinking = false;
         this.isBackground = false;
     }
 
@@ -27,6 +31,19 @@ public class CharacterCard {
         this.personality = personality;
         this.greeting = greeting;
         this.apiKey = apiKey != null ? apiKey : "";
+        this.model = "deepseek-chat";
+        this.enableThinking = false;
+        this.isBackground = false;
+    }
+
+    public CharacterCard(String name, String description, String personality, String greeting, String apiKey, String model, boolean enableThinking) {
+        this.name = name;
+        this.description = description;
+        this.personality = personality;
+        this.greeting = greeting;
+        this.apiKey = apiKey != null ? apiKey : "";
+        this.model = model != null ? model : "deepseek-chat";
+        this.enableThinking = enableThinking;
         this.isBackground = false;
     }
 
@@ -70,6 +87,22 @@ public class CharacterCard {
         this.apiKey = apiKey;
     }
 
+    public String getModel() {
+        return model;
+    }
+
+    public void setModel(String model) {
+        this.model = model;
+    }
+
+    public boolean isEnableThinking() {
+        return enableThinking;
+    }
+
+    public void setEnableThinking(boolean enableThinking) {
+        this.enableThinking = enableThinking;
+    }
+
     public boolean isBackground() {
         return isBackground;
     }
@@ -85,6 +118,8 @@ public class CharacterCard {
                 ", description='" + (description != null ? description.length() : 0) + " chars" +
                 ", personality='" + (personality != null ? personality.length() : 0) + " chars" +
                 ", apiKey='" + (apiKey != null && !apiKey.isEmpty() ? "***" : "empty") + '\'' +
+                ", model='" + model + '\'' +
+                ", enableThinking=" + enableThinking +
                 ", isBackground=" + isBackground +
                 '}';
     }

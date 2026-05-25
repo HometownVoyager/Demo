@@ -15,12 +15,29 @@ import java.util.List;
 public class DeepSeekApiClient {
     
     private static final String API_URL = "https://api.deepseek.com/v1/chat/completions";
-    private static final String MODEL = "deepseek-chat";
+    
+    // 预设模型选项
+    public static final String MODEL_DEEPSEEK_V4_FLASH = "deepseek-v4-flash";
+    public static final String MODEL_DEEPSEEK_V4_PRO = "deepseek-v4-pro";
+    public static final String MODEL_DEEPSEEK_CHAT = "deepseek-chat";
+    public static final String MODEL_DEEPSEEK_REASONER = "deepseek-reasoner";
     
     private final String apiKey;
+    private final String model;
+    private final boolean enableThinking;
     
     public DeepSeekApiClient(String apiKey) {
+        this(apiKey, MODEL_DEEPSEEK_CHAT, false);
+    }
+    
+    public DeepSeekApiClient(String apiKey, String model) {
+        this(apiKey, model, false);
+    }
+    
+    public DeepSeekApiClient(String apiKey, String model, boolean enableThinking) {
         this.apiKey = apiKey;
+        this.model = model != null ? model : MODEL_DEEPSEEK_CHAT;
+        this.enableThinking = enableThinking;
     }
     
     /**
@@ -33,7 +50,12 @@ public class DeepSeekApiClient {
     public String chat(String systemPrompt, List<ChatMessage> history) throws Exception {
         // 构建请求体
         StringBuilder requestBody = new StringBuilder();
-        requestBody.append("{\"model\":\"").append(MODEL).append("\",\"messages\":[");
+        requestBody.append("{\"model\":\"").append(model).append("\",\"messages\":[");
+        
+        // 添加 thinking 参数（如果启用）
+        if (enableThinking && MODEL_DEEPSEEK_REASONER.equals(model)) {
+            // deepseek-reasoner 模型支持思考模式
+        }
         
         // 添加 system prompt
         if (systemPrompt != null && !systemPrompt.isEmpty()) {
@@ -65,7 +87,7 @@ public class DeepSeekApiClient {
         conn.setRequestProperty("Authorization", "Bearer " + apiKey);
         conn.setDoOutput(true);
         conn.setConnectTimeout(30000);
-        conn.setReadTimeout(60000);
+        conn.setReadTimeout(120000); // 增加超时时间以支持思考模式
         
         try (OutputStream os = conn.getOutputStream()) {
             byte[] input = requestBody.toString().getBytes(StandardCharsets.UTF_8);

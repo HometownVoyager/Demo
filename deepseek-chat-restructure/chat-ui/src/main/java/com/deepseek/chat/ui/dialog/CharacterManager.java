@@ -1,5 +1,6 @@
 package com.deepseek.chat.ui.dialog;
 
+import com.deepseek.chat.api.DeepSeekApiClient;
 import com.deepseek.chat.core.model.CharacterCard;
 
 import javax.swing.*;
@@ -21,7 +22,17 @@ public class CharacterManager extends JDialog {
     private final JTextArea personalityArea;
     private final JTextArea greetingArea;
     private final JPasswordField apiKeyField;
+    private final JComboBox<String> modelComboBox;
+    private final JCheckBox thinkingCheckBox;
     private final JCheckBox backgroundCheckBox;
+    
+    // 预设模型选项
+    private static final String[] MODEL_OPTIONS = {
+        DeepSeekApiClient.MODEL_DEEPSEEK_CHAT,
+        DeepSeekApiClient.MODEL_DEEPSEEK_V4_FLASH,
+        DeepSeekApiClient.MODEL_DEEPSEEK_V4_PRO,
+        DeepSeekApiClient.MODEL_DEEPSEEK_REASONER
+    };
     
     /**
      * 回调接口，用于通知主窗口角色卡的变化
@@ -49,9 +60,11 @@ public class CharacterManager extends JDialog {
         greetingArea.setLineWrap(true);
         greetingArea.setWrapStyleWord(true);
         apiKeyField = new JPasswordField(20);
+        modelComboBox = new JComboBox<>(MODEL_OPTIONS);
+        thinkingCheckBox = new JCheckBox("开启思考模式（仅 deepseek-reasoner 有效）");
         backgroundCheckBox = new JCheckBox("背景角色（旁白/宏观调控者）");
         
-        setSize(750, 650);
+        setSize(800, 700);
         setLocationRelativeTo(parent);
         initUI();
         refreshList();
@@ -69,7 +82,7 @@ public class CharacterManager extends JDialog {
         
         JScrollPane listScrollPane = new JScrollPane(characterList);
         listScrollPane.setBorder(BorderFactory.createTitledBorder("角色卡列表"));
-        listScrollPane.setPreferredSize(new Dimension(150, 0));
+        listScrollPane.setPreferredSize(new Dimension(180, 0));
         add(listScrollPane, BorderLayout.WEST);
         
         // 右侧编辑面板
@@ -122,8 +135,22 @@ public class CharacterManager extends JDialog {
         gbc.weighty = 0;
         editPanel.add(apiKeyField, gbc);
         
-        gbc.gridx = 1;
+        gbc.gridx = 0;
         gbc.gridy = 5;
+        gbc.weighty = 0;
+        editPanel.add(new JLabel("模型选择:"), gbc);
+        
+        gbc.gridx = 1;
+        gbc.weighty = 0;
+        editPanel.add(modelComboBox, gbc);
+        
+        gbc.gridx = 1;
+        gbc.gridy = 6;
+        gbc.weighty = 0;
+        editPanel.add(thinkingCheckBox, gbc);
+        
+        gbc.gridx = 1;
+        gbc.gridy = 7;
         gbc.weighty = 0;
         editPanel.add(backgroundCheckBox, gbc);
         
@@ -166,6 +193,8 @@ public class CharacterManager extends JDialog {
             personalityArea.setText(cc.getPersonality());
             greetingArea.setText(cc.getGreeting());
             apiKeyField.setText(cc.getApiKey());
+            modelComboBox.setSelectedItem(cc.getModel());
+            thinkingCheckBox.setSelected(cc.isEnableThinking());
             backgroundCheckBox.setSelected(cc.isBackground());
         }
     }
@@ -176,6 +205,8 @@ public class CharacterManager extends JDialog {
         personalityArea.setText("");
         greetingArea.setText("");
         apiKeyField.setText("");
+        modelComboBox.setSelectedItem(DeepSeekApiClient.MODEL_DEEPSEEK_CHAT);
+        thinkingCheckBox.setSelected(false);
         backgroundCheckBox.setSelected(false);
         nameField.requestFocus();
     }
@@ -186,6 +217,8 @@ public class CharacterManager extends JDialog {
         String personality = personalityArea.getText().trim();
         String greeting = greetingArea.getText().trim();
         String apiKey = new String(apiKeyField.getPassword()).trim();
+        String model = (String) modelComboBox.getSelectedItem();
+        boolean enableThinking = thinkingCheckBox.isSelected();
         boolean isBackground = backgroundCheckBox.isSelected();
         
         if (name.isEmpty()) {
@@ -208,9 +241,11 @@ public class CharacterManager extends JDialog {
             cc.setPersonality(personality);
             cc.setGreeting(greeting);
             cc.setApiKey(apiKey);
+            cc.setModel(model);
+            cc.setEnableThinking(enableThinking);
             cc.setBackground(isBackground);
         } else {
-            characters.add(new CharacterCard(name, description, personality, greeting, apiKey));
+            characters.add(new CharacterCard(name, description, personality, greeting, apiKey, model, enableThinking));
             characters.get(characters.size() - 1).setBackground(isBackground);
         }
         
