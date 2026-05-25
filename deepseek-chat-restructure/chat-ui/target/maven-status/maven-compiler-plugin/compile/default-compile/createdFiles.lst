@@ -1,0 +1,10 @@
+com/deepseek/chat/ui/ChatWindow$1.class
+com/deepseek/chat/ui/dialog/CharacterManager.class
+com/deepseek/chat/ui/ChatWindow$SettingsPanelWrapper.class
+com/deepseek/chat/ui/component/InputPanel.class
+com/deepseek/chat/ui/ChatWindow$2.class
+com/deepseek/chat/ui/dialog/CharacterManager$CharacterCallback.class
+com/deepseek/chat/ui/component/SettingsPanel.class
+com/deepseek/chat/ui/dialog/WorldBookManager$WorldBookCallback.class
+com/deepseek/chat/ui/dialog/WorldBookManager.class
+com/deepseek/chat/ui/ChatWindow.class
