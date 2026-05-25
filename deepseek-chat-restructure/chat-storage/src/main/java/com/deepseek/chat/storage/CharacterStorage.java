@@ -52,7 +52,9 @@ public class CharacterStorage {
                 writer.println("    \"name\": \"" + escapeJson(cc.getName()) + "\",");
                 writer.println("    \"description\": \"" + escapeJson(cc.getDescription()) + "\",");
                 writer.println("    \"personality\": \"" + escapeJson(cc.getPersonality()) + "\",");
-                writer.println("    \"greeting\": \"" + escapeJson(cc.getGreeting()) + "\"");
+                writer.println("    \"greeting\": \"" + escapeJson(cc.getGreeting()) + "\",");
+                writer.println("    \"apiKey\": \"" + escapeJson(cc.getApiKey()) + "\",");
+                writer.println("    \"isBackground\": " + cc.isBackground());
                 writer.print("  }");
                 if (i < characters.size() - 1) {
                     writer.println(",");
@@ -79,13 +81,39 @@ public class CharacterStorage {
             String description = extractField(entry, "\"description\":");
             String personality = extractField(entry, "\"personality\":");
             String greeting = extractField(entry, "\"greeting\":");
+            String apiKey = extractField(entry, "\"apiKey\":");
+            boolean isBackground = extractBooleanField(entry, "\"isBackground\":");
             
             if (name != null && !name.isEmpty()) {
-                result.add(new CharacterCard(name, description, personality, greeting));
+                CharacterCard cc = new CharacterCard(name, description, personality, greeting, apiKey);
+                cc.setBackground(isBackground);
+                result.add(cc);
             }
         }
         
         return result;
+    }
+    
+    /**
+     * 提取布尔字段值
+     */
+    private boolean extractBooleanField(String text, String prefix) {
+        int index = text.indexOf(prefix);
+        if (index == -1) {
+            return false;
+        }
+        
+        int startIndex = index + prefix.length();
+        while (startIndex < text.length() && Character.isWhitespace(text.charAt(startIndex))) {
+            startIndex++;
+        }
+        
+        if (startIndex < text.length()) {
+            String boolStr = text.substring(startIndex, Math.min(startIndex + 5, text.length()));
+            return boolStr.startsWith("true");
+        }
+        
+        return false;
     }
     
     /**

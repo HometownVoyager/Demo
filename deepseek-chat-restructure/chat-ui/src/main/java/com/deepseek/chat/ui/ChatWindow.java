@@ -38,12 +38,14 @@ public class ChatWindow extends JFrame implements WorldBookManager.WorldBookCall
     private final CharacterStorage characterStorage;
     
     private List<ChatMessage> chatHistory;
+    private List<ChatMessage> summarizedHistory; // 总结后的上下文
     private List<WorldBook> worldBooks;
     private List<CharacterCard> characters;
-    private DeepSeekApiClient apiClient;
+    private DeepSeekApiClient defaultApiClient; // 默认 API 客户端
     
     private boolean isLoading = false;
     private String lastUserMessage = null;
+    private int summaryThreshold = 10; // 触发总结的消息阈值
     
     public ChatWindow() {
         super("DeepSeek Chat Client");
@@ -53,6 +55,7 @@ public class ChatWindow extends JFrame implements WorldBookManager.WorldBookCall
         characterStorage = new CharacterStorage();
         
         chatHistory = new ArrayList<>();
+        summarizedHistory = new ArrayList<>();
         worldBooks = new ArrayList<>();
         characters = new ArrayList<>();
         
@@ -118,7 +121,7 @@ public class ChatWindow extends JFrame implements WorldBookManager.WorldBookCall
         String systemPrompt = config.getProperty("system.prompt", "你是一个有帮助的 AI 助手。请用中文回答用户的问题。");
         
         if (!apiKey.isEmpty()) {
-            apiClient = new DeepSeekApiClient(apiKey);
+            defaultApiClient = new DeepSeekApiClient(apiKey);
             settingsPanel.getApiKeyField().setText(apiKey);
             settingsPanel.getSystemPromptArea().setText(systemPrompt);
             appendToChat("[系统] 配置已加载");
@@ -127,6 +130,7 @@ public class ChatWindow extends JFrame implements WorldBookManager.WorldBookCall
         }
         
         chatHistory = configManager.loadHistory();
+        summarizedHistory = new ArrayList<>();
         displayHistory();
         
         worldBooks = worldBookStorage.loadWorldBooks();
@@ -169,16 +173,43 @@ public class ChatWindow extends JFrame implements WorldBookManager.WorldBookCall
         }
         
         configManager.saveConfig(apiKey, systemPrompt);
-        apiClient = new DeepSeekApiClient(apiKey);
+        defaultApiClient = new DeepSeekApiClient(apiKey);
         appendToChat("[系统] 设置已保存");
         statusLabel.setText("设置已保存");
         updateEditButtons();
     }
     
+    /**
+     * 获取背景角色卡（如果有）
+     */
+    private CharacterCard getBackgroundCharacter() {
+        for (CharacterCard cc : characters) {
+            if (cc.isBackground()) {
+                return cc;
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * 获取选中的普通角色卡列表
+     */
+    private List<CharacterCard> getSelectedNormalCharacters() {
+        List<String> selectedNames = settingsPanel.getSelectedCharacters();
+        List<CharacterCard> result = new ArrayList<>();
+        for (CharacterCard cc : characters) {
+            if (!cc.isBackground() && selectedNames.contains(cc.getName())) {
+                result.add(cc);
+            }
+        }
+        return result;
+    }
+    
     private void sendMessage() {
         String userMessage = inputPanel.getInputText();
+        List<CharacterCard> selectedChars = getSelectedNormalCharacters();
         
-        if (userMessage.isEmpty() || isLoading || apiClient == null) {
+        if (userMessage.isEmpty() || isLoading || defaultApiClient == null) {
             return;
         }
         
@@ -192,15 +223,60 @@ public class ChatWindow extends JFrame implements WorldBookManager.WorldBookCall
         inputPanel.setButtonsEnabled(false);
         statusLabel.setText("正在发送请求...");
         
+        // 使用后台线程处理多角色对话
         new Thread(() -> {
             try {
-                String systemPrompt = buildSystemPrompt();
-                String response = apiClient.chat(systemPrompt, chatHistory);
+                CharacterCard backgroundChar = getBackgroundCharacter();
+                
+                // 如果有背景角色，先让背景角色发言
+                if (backgroundChar != null) {
+                    DeepSeekApiClient bgClient = new DeepSeekApiClient(
+                        backgroundChar.getApiKey().isEmpty() ? 
+                            new String(settingsPanel.getApiKeyField().getPassword()) : 
+                            backgroundChar.getApiKey()
+                    );
+                    String bgSystemPrompt = buildCharacterSystemPrompt(backgroundChar);
+                    String bgResponse = bgClient.chat(bgSystemPrompt, chatHistory);
+                    
+                    SwingUtilities.invokeLater(() -> {
+                        chatHistory.add(new ChatMessage("assistant", "[" + backgroundChar.getName() + "] " + bgResponse));
+                        displayMessageWithPrefix(backgroundChar.getName(), bgResponse);
+                    });
+                }
+                
+                // 为每个选中的角色调用 API
+                for (CharacterCard cc : selectedChars) {
+                    DeepSeekApiClient charClient = new DeepSeekApiClient(
+                        cc.getApiKey().isEmpty() ? 
+                            new String(settingsPanel.getApiKeyField().getPassword()) : 
+                            cc.getApiKey()
+                    );
+                    String charSystemPrompt = buildCharacterSystemPrompt(cc);
+                    String response = charClient.chat(charSystemPrompt, chatHistory);
+                    
+                    SwingUtilities.invokeLater(() -> {
+                        chatHistory.add(new ChatMessage("assistant", "[" + cc.getName() + "] " + response));
+                        displayMessageWithPrefix(cc.getName(), response);
+                        configManager.saveHistory(chatHistory);
+                    });
+                }
+                
+                // 如果没有选中任何角色，使用默认 API
+                if (selectedChars.isEmpty() && backgroundChar == null) {
+                    String systemPrompt = buildSystemPrompt();
+                    String response = defaultApiClient.chat(systemPrompt, chatHistory);
+                    
+                    SwingUtilities.invokeLater(() -> {
+                        chatHistory.add(new ChatMessage("assistant", response));
+                        displayMessage("assistant", response);
+                        configManager.saveHistory(chatHistory);
+                    });
+                }
+                
+                // 检查是否需要总结
+                maybeSummarizeHistory();
                 
                 SwingUtilities.invokeLater(() -> {
-                    chatHistory.add(new ChatMessage("assistant", response));
-                    displayMessage("assistant", response);
-                    configManager.saveHistory(chatHistory);
                     isLoading = false;
                     inputPanel.setButtonsEnabled(true);
                     inputPanel.getRetryButton().setEnabled(true);
@@ -240,25 +316,98 @@ public class ChatWindow extends JFrame implements WorldBookManager.WorldBookCall
             }
         }
         
-        // 添加角色卡提示词
-        String selectedCharacter = settingsPanel.getSelectedCharacter();
-        if (!"-- 无 --".equals(selectedCharacter)) {
-            for (CharacterCard cc : characters) {
-                if (cc.getName().equals(selectedCharacter)) {
-                    sb.append("【角色设定】\n");
-                    sb.append("名称：").append(cc.getName()).append("\n");
-                    sb.append("描述：").append(cc.getDescription()).append("\n");
-                    sb.append("性格：").append(cc.getPersonality()).append("\n");
-                    if (cc.getGreeting() != null && !cc.getGreeting().isEmpty()) {
-                        sb.append("问候语：").append(cc.getGreeting()).append("\n");
-                    }
-                    sb.append("\n");
+        return sb.toString();
+    }
+    
+    /**
+     * 为单个角色构建系统提示词
+     */
+    private String buildCharacterSystemPrompt(CharacterCard cc) {
+        StringBuilder sb = new StringBuilder();
+        
+        // 基础 System Prompt
+        String basePrompt = settingsPanel.getSystemPromptArea().getText().trim();
+        if (!basePrompt.isEmpty()) {
+            sb.append(basePrompt).append("\n\n");
+        }
+        
+        // 添加世界书内容
+        String selectedWorldBook = settingsPanel.getSelectedWorldBook();
+        if (!"-- 无 --".equals(selectedWorldBook)) {
+            for (WorldBook wb : worldBooks) {
+                if (wb.getName().equals(selectedWorldBook)) {
+                    sb.append("【世界观设定】\n").append(wb.getContent()).append("\n\n");
                     break;
                 }
             }
         }
         
+        // 添加角色卡提示词
+        sb.append("【角色设定】\n");
+        sb.append("名称：").append(cc.getName()).append("\n");
+        sb.append("描述：").append(cc.getDescription()).append("\n");
+        sb.append("性格：").append(cc.getPersonality()).append("\n");
+        if (cc.getGreeting() != null && !cc.getGreeting().isEmpty()) {
+            sb.append("问候语：").append(cc.getGreeting()).append("\n");
+        }
+        
+        if (cc.isBackground()) {
+            sb.append("\n你是一个旁白和宏观调控者，负责控制其他虚拟角色的发言和禁言，推动剧情发展。\n");
+        } else {
+            sb.append("\n请保持角色设定进行对话。\n");
+        }
+        
         return sb.toString();
+    }
+    
+    /**
+     * 显示带角色前缀的消息
+     */
+    private void displayMessageWithPrefix(String characterName, String content) {
+        String coloredText = "<b>" + characterName + ":</b><br>" + content.replace("\n", "<br>") + "<br><br>";
+        chatDisplayArea.setContentType("text/html");
+        chatDisplayArea.setText(chatDisplayArea.getText() + coloredText);
+        chatDisplayArea.setCaretPosition(chatDisplayArea.getDocument().getLength());
+    }
+    
+    /**
+     * 检查是否需要总结历史消息
+     */
+    private void maybeSummarizeHistory() {
+        if (chatHistory.size() >= summaryThreshold && defaultApiClient != null) {
+            summarizeHistory();
+        }
+    }
+    
+    /**
+     * 总结历史消息
+     */
+    private void summarizeHistory() {
+        new Thread(() -> {
+            try {
+                String summaryPrompt = "请总结以下对话的主要内容，包括关键事件、人物关系和重要信息。用简洁的中文概括：\n";
+                for (ChatMessage msg : chatHistory) {
+                    String role = "user".equals(msg.getRole()) ? "用户" : "AI";
+                    summaryPrompt += role + ": " + msg.getContent() + "\n";
+                }
+                
+                List<ChatMessage> summaryMessages = new ArrayList<>();
+                summaryMessages.add(new ChatMessage("user", summaryPrompt));
+                
+                String systemPrompt = "你是一个对话总结助手。请用简洁的中文总结对话内容，保留关键信息。";
+                String summary = defaultApiClient.chat(systemPrompt, summaryMessages);
+                
+                SwingUtilities.invokeLater(() -> {
+                    summarizedHistory.clear();
+                    summarizedHistory.add(new ChatMessage("system", "[对话总结]\n" + summary));
+                    appendToChat("[系统] 已生成对话总结（共 " + chatHistory.size() + " 条消息）");
+                });
+            } catch (Exception ex) {
+                SwingUtilities.invokeLater(() -> {
+                    appendToChat("[系统] 总结失败：" + ex.getMessage());
+                });
+            }
+        }).start();
     }
     
     private void displayHistory() {
@@ -319,7 +468,7 @@ public class ChatWindow extends JFrame implements WorldBookManager.WorldBookCall
         new Thread(() -> {
             try {
                 String systemPrompt = buildSystemPrompt();
-                String response = apiClient.chat(systemPrompt, chatHistory);
+                String response = defaultApiClient.chat(systemPrompt, chatHistory);
                 
                 SwingUtilities.invokeLater(() -> {
                     chatHistory.add(new ChatMessage("assistant", response));
@@ -489,7 +638,7 @@ public class ChatWindow extends JFrame implements WorldBookManager.WorldBookCall
             }
             
             configManager.saveConfig(inputApiKey, inputSystemPrompt);
-            apiClient = new DeepSeekApiClient(inputApiKey);
+            defaultApiClient = new DeepSeekApiClient(inputApiKey);
             settingsPanel.getApiKeyField().setText(inputApiKey);
             settingsPanel.getSystemPromptArea().setText(inputSystemPrompt);
             appendToChat("[系统] 初始设置已保存");

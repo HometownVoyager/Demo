@@ -20,6 +20,8 @@ public class CharacterManager extends JDialog {
     private final JTextArea descriptionArea;
     private final JTextArea personalityArea;
     private final JTextArea greetingArea;
+    private final JPasswordField apiKeyField;
+    private final JCheckBox backgroundCheckBox;
     
     /**
      * 回调接口，用于通知主窗口角色卡的变化
@@ -46,8 +48,10 @@ public class CharacterManager extends JDialog {
         greetingArea = new JTextArea(3, 25);
         greetingArea.setLineWrap(true);
         greetingArea.setWrapStyleWord(true);
+        apiKeyField = new JPasswordField(20);
+        backgroundCheckBox = new JCheckBox("背景角色（旁白/宏观调控者）");
         
-        setSize(700, 600);
+        setSize(750, 650);
         setLocationRelativeTo(parent);
         initUI();
         refreshList();
@@ -109,6 +113,20 @@ public class CharacterManager extends JDialog {
         gbc.weighty = 1;
         editPanel.add(new JScrollPane(greetingArea), gbc);
         
+        gbc.gridx = 0;
+        gbc.gridy = 4;
+        gbc.weighty = 0;
+        editPanel.add(new JLabel("API Key:"), gbc);
+        
+        gbc.gridx = 1;
+        gbc.weighty = 0;
+        editPanel.add(apiKeyField, gbc);
+        
+        gbc.gridx = 1;
+        gbc.gridy = 5;
+        gbc.weighty = 0;
+        editPanel.add(backgroundCheckBox, gbc);
+        
         add(editPanel, BorderLayout.CENTER);
         
         // 底部按钮
@@ -147,6 +165,8 @@ public class CharacterManager extends JDialog {
             descriptionArea.setText(cc.getDescription());
             personalityArea.setText(cc.getPersonality());
             greetingArea.setText(cc.getGreeting());
+            apiKeyField.setText(cc.getApiKey());
+            backgroundCheckBox.setSelected(cc.isBackground());
         }
     }
     
@@ -155,6 +175,8 @@ public class CharacterManager extends JDialog {
         descriptionArea.setText("");
         personalityArea.setText("");
         greetingArea.setText("");
+        apiKeyField.setText("");
+        backgroundCheckBox.setSelected(false);
         nameField.requestFocus();
     }
     
@@ -163,6 +185,8 @@ public class CharacterManager extends JDialog {
         String description = descriptionArea.getText().trim();
         String personality = personalityArea.getText().trim();
         String greeting = greetingArea.getText().trim();
+        String apiKey = new String(apiKeyField.getPassword()).trim();
+        boolean isBackground = backgroundCheckBox.isSelected();
         
         if (name.isEmpty()) {
             JOptionPane.showMessageDialog(this, "请输入名称", "错误", JOptionPane.ERROR_MESSAGE);
@@ -183,8 +207,11 @@ public class CharacterManager extends JDialog {
             cc.setDescription(description);
             cc.setPersonality(personality);
             cc.setGreeting(greeting);
+            cc.setApiKey(apiKey);
+            cc.setBackground(isBackground);
         } else {
-            characters.add(new CharacterCard(name, description, personality, greeting));
+            characters.add(new CharacterCard(name, description, personality, greeting, apiKey));
+            characters.get(characters.size() - 1).setBackground(isBackground);
         }
         
         if (callback != null) {

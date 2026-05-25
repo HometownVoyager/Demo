@@ -3,6 +3,8 @@ package com.deepseek.chat.ui.component;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 设置面板组件
@@ -13,7 +15,8 @@ public class SettingsPanel extends JPanel {
     private final JPasswordField apiKeyField;
     private final JTextArea systemPromptArea;
     private final JComboBox<String> activeWorldBookCombo;
-    private final JComboBox<String> activeCharacterCombo;
+    private final JPanel characterSelectionPanel;
+    private final List<JCheckBox> characterCheckBoxes;
     private final JButton saveSettingsButton;
     private final JButton clearButton;
     private final JButton worldBookButton;
@@ -33,8 +36,10 @@ public class SettingsPanel extends JPanel {
         activeWorldBookCombo = new JComboBox<>();
         activeWorldBookCombo.addItem("-- 无 --");
         
-        activeCharacterCombo = new JComboBox<>();
-        activeCharacterCombo.addItem("-- 无 --");
+        characterCheckBoxes = new ArrayList<>();
+        characterSelectionPanel = new JPanel();
+        characterSelectionPanel.setLayout(new BoxLayout(characterSelectionPanel, BoxLayout.Y_AXIS));
+        characterSelectionPanel.setBackground(new Color(230, 230, 230));
         
         saveSettingsButton = new JButton("保存设置");
         clearButton = new JButton("清空对话");
@@ -81,20 +86,27 @@ public class SettingsPanel extends JPanel {
         gbc.weightx = 1;
         add(activeWorldBookCombo, gbc);
         
-        // 角色卡选择
+        // 角色卡选择（多选面板）
         gbc.gridx = 0;
         gbc.gridy = 3;
         gbc.weightx = 0;
+        gbc.gridheight = 2;
+        gbc.anchor = GridBagConstraints.NORTH;
         add(new JLabel("角色卡:"), gbc);
         
         gbc.gridx = 1;
-        gbc.weightx = 1;
-        add(activeCharacterCombo, gbc);
+        gbc.weighty = 1;
+        JScrollPane characterScroll = new JScrollPane(characterSelectionPanel);
+        characterScroll.setPreferredSize(new Dimension(400, 100));
+        characterScroll.setBorder(BorderFactory.createLineBorder(Color.GRAY));
+        add(characterScroll, gbc);
         
         // 按钮
         gbc.gridx = 0;
-        gbc.gridy = 4;
-        gbc.weightx = 0;
+        gbc.gridy = 5;
+        gbc.weighty = 0;
+        gbc.gridheight = 1;
+        gbc.anchor = GridBagConstraints.CENTER;
         add(saveSettingsButton, gbc);
         
         gbc.gridx = 1;
@@ -110,13 +122,27 @@ public class SettingsPanel extends JPanel {
     public JPasswordField getApiKeyField() { return apiKeyField; }
     public JTextArea getSystemPromptArea() { return systemPromptArea; }
     public JComboBox<String> getActiveWorldBookCombo() { return activeWorldBookCombo; }
-    public JComboBox<String> getActiveCharacterCombo() { return activeCharacterCombo; }
     public JButton getSaveSettingsButton() { return saveSettingsButton; }
     public JButton getClearButton() { return clearButton; }
     public JButton getWorldBookButton() { return worldBookButton; }
     public JButton getCharacterButton() { return characterButton; }
     
-    // Setters for combo box items
+    /**
+     * 获取选中的角色卡名称列表
+     */
+    public List<String> getSelectedCharacters() {
+        List<String> selected = new ArrayList<>();
+        for (JCheckBox cb : characterCheckBoxes) {
+            if (cb.isSelected()) {
+                selected.add(cb.getText());
+            }
+        }
+        return selected;
+    }
+    
+    /**
+     * 设置世界书下拉框选项
+     */
     public void setWorldBookItems(String[] items) {
         activeWorldBookCombo.removeAllItems();
         activeWorldBookCombo.addItem("-- 无 --");
@@ -125,21 +151,28 @@ public class SettingsPanel extends JPanel {
         }
     }
     
+    /**
+     * 设置角色卡复选框列表
+     */
     public void setCharacterItems(String[] items) {
-        activeCharacterCombo.removeAllItems();
-        activeCharacterCombo.addItem("-- 无 --");
+        characterCheckBoxes.clear();
+        characterSelectionPanel.removeAll();
+        
         for (String item : items) {
-            activeCharacterCombo.addItem(item);
+            JCheckBox cb = new JCheckBox(item);
+            characterCheckBoxes.add(cb);
+            characterSelectionPanel.add(cb);
         }
+        
+        characterSelectionPanel.revalidate();
+        characterSelectionPanel.repaint();
     }
     
+    /**
+     * 获取选中的世界书名称
+     */
     public String getSelectedWorldBook() {
         Object selected = activeWorldBookCombo.getSelectedItem();
-        return selected != null ? selected.toString() : "";
-    }
-    
-    public String getSelectedCharacter() {
-        Object selected = activeCharacterCombo.getSelectedItem();
         return selected != null ? selected.toString() : "";
     }
 }
